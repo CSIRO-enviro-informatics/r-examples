@@ -1,0 +1,58 @@
+---
+title: "Using the CSIRO Knowledge Network to retrieve a spatial thing in R"
+author: "Jonathan Yu"
+date: "20 May 2017"
+output:
+  html_document:
+      self_contained: true
+      keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Using the CSIRO Knowledge Network (KN) to retrieve a spatial thing in R
+
+### Using HTTP Get requests to query KN for spatial things
+
+KN hosts a registry of spatial things and APIs for searching appropriate ones. This shows how to query KN for a spatial thing called "victoria".
+
+We use the httr library to issue a HTTP Get request for this. KN accepts a 'q' parameter for a search string against the spatial feature search API 'http://kn.csiro.au/api/search/feature'
+
+```{r search_kn}
+library(httr)
+r <- GET("http://kn.csiro.au/api/search/feature?q=victoria")
+status_code(r)
+```
+
+Assuming we receive a HTTP status code '200', we're good to go. KN returns the first 5 results by default. Each item in the list is a metadata record with the persistent identifier for the spatial thing via the 'pid' key. We'll take the first result in the list and use the pid to fetch the geojson via the next KN API 'http://kn.csiro.au/api/feature'.
+
+```{r fetch_geojson}
+json <- content(r, "parsed")
+json[[1]]$pid
+geojsonUrl <- paste("http://kn.csiro.au/api/feature?id=", json[[1]]$pid, sep="")
+r_geojson <- GET(geojsonUrl)
+geojson <- content(r_geojson, 'parsed')
+```
+
+Assuming HTTP 200 status code, we'll use the received geojson string and load it in as a spatial object using the geojsonio library.
+
+```{r convert_sp}
+library(geojsonio)
+g <- geojsonio::as.json(geojson)
+spdf <- geojsonio::geojson_sp(g)
+```
+
+Now that we've setup the spatial object (spdf), we'll use the leaflet library to render this on a map.
+
+```{r view_in_leaflet}
+library(leaflet)
+leaflet(spdf) %>%
+   addTiles() %>%
+   addPolygons(color = "#444444", weight = 1, smoothFactor = 0.5,
+   opacity = 1.0, fillOpacity = 0.5,
+   fillColor = "#444444", highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE))
+```
+
+Ta-da!

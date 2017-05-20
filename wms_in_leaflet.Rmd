@@ -1,0 +1,35 @@
+---
+title: "Render WMS in leaflet"
+author: "Jonathan Yu"
+date: "20 May 2017"
+output: 
+  html_document:
+      self_contained: true
+      keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load the leaflet library.
+
+```{r libs, echo=FALSE}
+library(leaflet)
+```
+
+```{r params}
+oznome_wms <- "http://geo.oznome.csiro.au/geoserver/oznome/wms"
+selected_layer <- "oznome:POA_2011_AUST_simple"
+```
+
+Render the selected layer in the OzNome WMS server.
+
+```{r oznome_map, echo=FALSE}
+leaflet() %>% 
+  addTiles() %>% 
+  addWMSTiles(oznome_wms, layers = selected_layer,
+    options = WMSTileOptions(format = "image/png", transparent = TRUE)
+  ) %>%
+  fitBounds(96.816948192,-43.598215003,159.105424992,-9.219936953000001)
+```
