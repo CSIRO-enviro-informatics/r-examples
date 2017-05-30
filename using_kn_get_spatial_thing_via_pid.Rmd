@@ -30,8 +30,8 @@ Assuming we receive a HTTP status code '200', we're good to go. KN returns the f
 
 ```{r fetch_geojson}
 json <- content(r, "parsed")
-json[[1]]$pid
-geojsonUrl <- paste("http://kn.csiro.au/api/feature?id=", json[[1]]$pid, sep="")
+spatial_pid <- json[[1]]$pid
+geojsonUrl <- paste("http://kn.csiro.au/api/feature?id=", spatial_pid, sep="")
 r_geojson <- GET(geojsonUrl)
 geojson <- content(r_geojson, 'parsed')
 ```
