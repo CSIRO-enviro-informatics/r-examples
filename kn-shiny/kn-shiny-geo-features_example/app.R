@@ -1,50 +1,98 @@
-#
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
-
 library(shiny)
+library(leaflet)
+library(RColorBrewer)
+library(httr)
+library(knlibr)
+library(geojsonio)
 
-# Define UI for application that draws a histogram
-ui <- fluidPage(
-   
-   # Application title
-   titlePanel("Old Faithful Geyser Data"),
-   
-   # Sidebar with a slider input for number of bins 
-   sidebarLayout(
-      sidebarPanel(
-         sliderInput("bins",
-                     "Number of bins:",
-                     min = 1,
-                     max = 50,
-                     value = 30)
-      ),
-      
-      # Show a plot of the generated distribution
-      mainPanel(
-         plotOutput("distPlot")
-      )
-   )
+ui <- bootstrapPage(
+  tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
+  leafletOutput("map", width = "100%", height = "100%"),
+  absolutePanel(top = 10, right = 10,
+                textInput("featSearch", "Search for Geo-feature from KN"),
+                selectInput("resultList", "Result", list("No results yet"=0),selectize=FALSE, size=5)
+  )
 )
 
-# Define server logic required to draw a histogram
-server <- function(input, output) {
-   
-   output$distPlot <- renderPlot({
-      # generate bins based on input$bins from ui.R
-      x    <- faithful[, 2] 
-      bins <- seq(min(x), max(x), length.out = input$bins + 1)
-      
-      # draw the histogram with the specified number of bins
-      hist(x, breaks = bins, col = 'darkgray', border = 'white')
-   })
+server <- function(input, output, session) {
+  searchResult <- NULL
+  # Reactive expression for the data subsetted to what the user selected
+  filteredData <- reactive({
+    #  quakes[quakes$mag >= input$range[1] & quakes$mag <= input$range[2],]
+  })
+
+  observe({
+    x <- input$featSearch
+    searchResult <<- kn_feat_search(input$featSearch, 0, 5)
+
+    if(!is.null(searchResult)) {
+      labels <- searchResult[,2]
+
+      #mylist <- list()
+      #for(i in 1:length(labels)){
+      #  curr <- labels[[i]]
+      #  mylist[[]] <- curr
+      #}
+      myList <- c(1:length(labels))
+      names(myList) <- labels
+      #names(labels) <- myList
+
+      # Can also set the label and select items
+      updateSelectInput(session, "resultList",
+                        choices = myList,
+                        selected = tail(x, 1)
+      )
+    }
+    else {
+      updateSelectInput(session, "resultList",
+                        choices = c("No results"),
+                        selected = tail(x, 1)
+      )
+    }
+  })
+
+  observeEvent(input$resultList, {
+    selected <- input$resultList
+    x <- strtoi(selected)
+    print(x)
+    #get pid
+    pid <- searchResult[x]
+    print(pid)
+
+    withProgress(message = 'Fetching geo-feature', value = 0, {
+      setProgress(value = 0.3, detail = "Querying KN")
+
+      sp <- kn_get_geojson(pid)
+
+      setProgress(value = 0.5, detail = "Rendering spatial object...")
+
+      if(!is.null(sp)) {
+        print("received geojson object and rendering in leaflet")
+        proxy <- leafletProxy("map",session) %>%
+          clearShapes() %>%
+          addPolygons(data=sp, color = "#444444", weight = 1, smoothFactor = 0.5,
+                      opacity = 1.0, fillOpacity = 0.5,
+                      fillColor = "#444444", highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE))
+        setProgress(value = 1, detail = "Done.")
+
+
+      }
+    })
+
+  })
+
+
+  output$map <- renderLeaflet({
+    # Use leaflet() here, and only include aspects of the map that
+    # won't need to change dynamically (at least, not unless the
+    # entire map is being torn down and recreated).
+    leaflet() %>%
+      addTiles()    %>%
+      fitBounds(112.467, -55.050, 168.000, -9.133)
+  })
+
+
+
 }
 
-# Run the application 
-shinyApp(ui = ui, server = server)
-
+shinyApp(ui, server)
